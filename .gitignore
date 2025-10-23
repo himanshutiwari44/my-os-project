@@ -1,0 +1,26 @@
+# Node
+node_modules/
+.env
+.env.local
+.env.*.local
+
+# build artifacts
+dist/
+build/
+
+# Vite cache
+.vite/
+
+# logs
+npm-debug.log*
+
+# backend cpp binaries
+cpp/bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

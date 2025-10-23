@@ -1,0 +1,25 @@
+{
+  "name": "cpu-scheduler-backend",
+  "version": "1.0.0",
+  "description": "Backend for CPU Scheduling Algorithm Visualizer",
+  "main": "server.js",
+  "scripts": {
+    "autocompile": "node scripts/autocompile.js",
+    "prestart": "npm run autocompile",
+    "start": "node server.js",
+    "predev": "npm run autocompile",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^7.5.3",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["cpu", "scheduling", "algorithms", "visualizer"],
+  "author": "",
+  "license": "MIT"
+}
