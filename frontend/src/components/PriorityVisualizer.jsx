@@ -14,9 +14,9 @@ const PriorityVisualizer = () => {
     setError(null);
     
     try {
-      const response = await axios.post('http://localhost:5000/api/priority', {
-        processes: processes
-      });
+      const responsePriority = await axios.post('https://scheduling-algorithms-zk3r.onrender.com/api/priority', {
+  processes: processes
+});
       
       setResult(response.data.result);
     } catch (err) {

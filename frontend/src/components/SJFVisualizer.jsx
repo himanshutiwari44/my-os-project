@@ -14,9 +14,9 @@ const SJFVisualizer = () => {
     setError(null);
     
     try {
-      const response = await axios.post('http://localhost:5000/api/sjf', {
-        processes: processes
-      });
+     const response = await axios.post('https://scheduling-algorithms-zk3r.onrender.com/api/sjf', {
+  processes: processes
+});
       
       setResult(response.data.result);
     } catch (err) {

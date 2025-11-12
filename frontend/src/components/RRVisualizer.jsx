@@ -15,10 +15,9 @@ const RRVisualizer = () => {
     setError(null);
     
     try {
-      const response = await axios.post('http://localhost:5000/api/rr', {
-        processes: processes,
-        quantum: quantum
-      });
+      const response = await axios.post('https://scheduling-algorithms-zk3r.onrender.com/api/fcfs', {
+  processes: processes
+});
       
       setResult(response.data.result);
     } catch (err) {

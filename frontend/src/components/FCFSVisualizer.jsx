@@ -14,9 +14,10 @@ const FCFSVisualizer = () => {
     setError(null);
     
     try {
-      const response = await axios.post('http://localhost:5000/api/fcfs', {
-        processes: processes
-      });
+      const response = await axios.post('https://scheduling-algorithms-zk3r.onrender.com/api/fcfs', {
+  processes: processes
+});
+
       
       setResult(response.data.result);
     } catch (err) {
