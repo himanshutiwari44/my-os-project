@@ -12,7 +12,6 @@ const PriorityVisualizer = () => {
   const handleSubmit = async (processes) => {
     setLoading(true);
     setError(null);
-    
     try {
       const responsePriority = await axios.post('https://scheduling-algorithms-zk3r.onrender.com/api/priority', {
   processes: processes

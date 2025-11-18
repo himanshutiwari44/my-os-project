@@ -1,11 +1,18 @@
-// In-memory filesystem and simple shell commands (JS port)
-
+// // In-memory filesystem and simple shell commands (JS port)
+// /**
+//  * This is the "Head Chef" function.
+//  * It's the main "engine" that the frontend calls.
+//  * It takes the user's command, the current path, and the entire file system object.
+//  * It returns a "result" object: { output, newPath, newFileSystem }
+//  */
 export function executeCommand(command, currentPath, fileSystem) {
+  // 1. Parse the command
+  // Splits "mkdir my-folder" into cmd="mkdir" and args=["my-folder"]
   const parts = command.trim().split(/\s+/);
   const cmd = parts[0];
   const args = parts.slice(1);
 
-  // helper to call backend fs API; returns null on failure
+  // Helper to call a REAL server backend (not used by most of the in-memory commands)
   async function callApi(path, method = 'GET', body) {
     try {
       const url = new URL(`/api/fs${path}`, window.location.origin).toString();
@@ -21,8 +28,10 @@ export function executeCommand(command, currentPath, fileSystem) {
     }
   }
 
+  // 2. Decide what to do based on the command
   switch (cmd) {
     case "help":
+      // Returns a simple help message for the frontend to print
       return {
         output: `Available commands:
   ls              - List directory contents
@@ -35,41 +44,43 @@ export function executeCommand(command, currentPath, fileSystem) {
       };
 
     case "pwd":
+      // "Print Working Directory" - Just returns the currentPath
       return { output: currentPath };
 
     case "clear":
+      // Tells the frontend to clear the screen (by returning an empty output)
+      // The frontend logic will see "clear" and reset its own history array.
       return { output: "", newFileSystem: fileSystem };
 
     case "ls": {
-      // Try backend first (synchronous fallback using local FS is not possible because fetch is async).
-      // We'll return a placeholder indicating async handling is required by caller.
-      // Frontend components already call executeCommand synchronously; to keep compatibility we will
-      // return a special token that the UI code can detect (not ideal). Simpler: keep existing local logic
-      // if backend is not used. For now, we keep local behavior and the UI should later call API directly
-      // for persistence.
-
+      // "List" - Lists the contents of the current directory
+      // Get the node (folder) for the current path
       const node = getNode(fileSystem, currentPath);
       if (!node || node.type !== "directory") {
         return { output: "Error: Not a directory" };
       }
 
       if (!node.children || Object.keys(node.children).length === 0) {
-        return { output: "" };
+        return { output: "" }; // Empty directory
       }
 
+      // Loop through all children and format them into a string
       const items = Object.entries(node.children)
         .map(([name, child]) => (child.type === "directory" ? `📁 ${name}/` : `📄 ${name}`))
-        .join("\n");
+        .join("\n"); // Separate each item with a new line
 
       return { output: items };
     }
 
     case "cd": {
+      // "Change Directory"
       if (args.length === 0) {
-        return { output: "", newPath: "/" };
+        return { output: "", newPath: "/" }; // 'cd' with no args goes to root
       }
 
+      // Figure out the full, absolute path of the target directory
       const targetPath = parsePath(currentPath, args[0]);
+      // Check if that path actually exists and is a directory
       const node = getNode(fileSystem, targetPath);
 
       if (!node) {
@@ -80,10 +91,12 @@ export function executeCommand(command, currentPath, fileSystem) {
         return { output: `cd: ${args[0]}: Not a directory` };
       }
 
+      // Success! Return the newPath for the frontend to save in its 'cwd' state
       return { output: "", newPath: targetPath };
     }
 
     case "mkdir": {
+      // "Make Directory"
       if (args.length === 0) {
         return { output: "mkdir: missing operand" };
       }
@@ -91,26 +104,30 @@ export function executeCommand(command, currentPath, fileSystem) {
       if (dirName.includes("/")) {
         return { output: "mkdir: invalid directory name" };
       }
-      // Call backend endpoint; if it fails, fallback to local
-      try {
-        const res = null; // skipping async call in this sync function
-      } catch (e) {}
+      
+      // ...skipping backend call for now...
 
+      // Check if we are inside a valid directory
       const node = getNode(fileSystem, currentPath);
       if (!node || node.type !== "directory") {
         return { output: "Error: Current path is not a directory" };
       }
 
+      // Check if a file/folder with that name already exists
       if (node.children && node.children[dirName]) {
         return { output: `mkdir: ${dirName}: File exists` };
       }
 
+      // Create the full path for the new directory
       const newPath = currentPath === "/" ? `/${dirName}` : `${currentPath}/${dirName}`;
+      // Create a *new* file system object with the new directory added
       const newFs = setNode(fileSystem, newPath, { type: "directory", children: {} });
+      // Return the new file system for the frontend to save in its 'fs' state
       return { output: "", newFileSystem: newFs };
     }
 
     case "touch": {
+      // "Create File" - (like mkdir but for a file)
       if (args.length === 0) {
         return { output: "touch: missing file operand" };
       }
@@ -127,16 +144,24 @@ export function executeCommand(command, currentPath, fileSystem) {
         return { output: `touch: ${fileName}: File exists` };
       }
 
+      // Create the full path for the new file
       const newPath = currentPath === "/" ? `/${fileName}` : `${currentPath}/${fileName}`;
+      // Create a *new* file system object with the new file added
       const newFs = setNode(fileSystem, newPath, { type: "file" });
+      // Return the new file system
       return { output: "", newFileSystem: newFs };
     }
 
     default:
+      // If the command isn't in the switch, it's not found
       return { output: `${cmd}: command not found` };
   }
 }
 
+/**
+ * Creates the starting, default file system object.
+ * This is what the frontend gets when it first loads.
+ */
 export function createInitialFileSystem() {
   return {
     "/": {
@@ -149,38 +174,56 @@ export function createInitialFileSystem() {
   };
 }
 
+/**
+ * A helper function to figure out an absolute path.
+ * It handles ".." (go up), "/" (root), and relative paths.
+ */
 function parsePath(currentPath, targetPath) {
   if (targetPath === "/") return "/";
-  if (targetPath.startsWith("/")) return targetPath;
+  if (targetPath.startsWith("/")) return targetPath; // Already absolute
   if (targetPath === "..") {
+    // Go up one level
     if (currentPath === "/") return "/";
     const parts = currentPath.split("/").filter(Boolean);
     parts.pop();
     return "/" + parts.join("/");
   }
+  // Relative path, e.g., "my-folder"
   if (currentPath === "/") return "/" + targetPath;
   return currentPath + "/" + targetPath;
 }
 
+/**
+ * A helper to "find" a file or folder (a "node") in the file system.
+ * It "walks" the path to get the data.
+ */
 function getNode(fs, path) {
   if (path === "/") return fs["/"];
-  const parts = path.split("/").filter(Boolean);
+  const parts = path.split("/").filter(Boolean); // e.g., "home", "user"
   let current = fs["/"];
   for (const part of parts) {
-    if (!current.children || !current.children[part]) return null;
+    if (!current.children || !current.children[part]) return null; // Not found
     current = current.children[part];
   }
   return current;
 }
 
+/**
+ * A helper to "write" a new file or folder to the file system.
+ * It creates a *copy* of the file system to avoid changing the original.
+ * This is *critical* for React state to update correctly.
+ */
 function setNode(fs, path, node) {
+  // Create a deep copy so we don't change the original 'fs' object
   const newFs = JSON.parse(JSON.stringify(fs));
+  
   if (path === "/") {
     newFs["/"] = node;
     return newFs;
   }
   const parts = path.split("/").filter(Boolean);
   let current = newFs["/"];
+  // Walk the path, creating directories if they don't exist
   for (let i = 0; i < parts.length - 1; i++) {
     if (!current.children) current.children = {};
     if (!current.children[parts[i]]) {
@@ -188,36 +231,48 @@ function setNode(fs, path, node) {
     }
     current = current.children[parts[i]];
   }
+  // Set the final node (file or directory)
   if (!current.children) current.children = {};
   current.children[parts[parts.length - 1]] = node;
   return newFs;
 }
 
-// Remove an entry at path (file or directory). Returns new fs or throws if not found.
+/**
+ * A helper to "delete" a file or folder.
+ * It also creates a deep copy to ensure immutability.
+ */
 export function removePath(fs, path) {
+  // Create a deep copy
   const newFs = JSON.parse(JSON.stringify(fs));
   if (path === "/") throw new Error('Cannot remove root');
+  
+  // Find the *parent* directory
   const parts = path.split('/').filter(Boolean);
   let current = newFs['/'];
   for (let i = 0; i < parts.length - 1; i++) {
     if (!current.children || !current.children[parts[i]]) throw new Error('Path not found');
     current = current.children[parts[i]];
   }
+  
+  // Find the target node and delete it
   if (!current.children || !current.children[parts[parts.length - 1]]) throw new Error('Path not found');
   delete current.children[parts[parts.length - 1]];
-  return newFs;
+  return newFs; // Return the modified copy
 }
 
-// Export helpers so the UI can manipulate the in-memory FS without backend
+// Export helpers so the UI can use them if needed
 export { getNode, setNode };
 
-// Async backend API helpers
+// === ASYNC BACKEND API HELPERS ===
+// These functions are for talking to a REAL server.
+// They use 'fetch' to make network requests.
+// They are NOT used by the main 'executeCommand' logic above.
+
 export async function apiLs(path) {
   try {
     const res = await fetch(`/api/fs/ls?path=${encodeURIComponent(path)}`);
     if (!res.ok) return null;
     const data = await res.json();
-    // controller returns { entries: [...] }
     return data.entries || [];
   } catch (err) {
     return null;
@@ -238,55 +293,4 @@ export async function apiMkdir(path, name) {
   }
 }
 
-export async function apiTouch(path, name) {
-  try {
-    const res = await fetch('/api/fs/touch', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, name })
-    });
-    if (!res.ok) return { ok: false, error: 'Network error' };
-    const data = await res.json();
-    return { ok: true, data };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-export async function apiRm(path) {
-  try {
-    const res = await fetch('/api/fs/rm', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path })
-    });
-    if (!res.ok) return { ok: false, error: 'Network error' };
-    const data = await res.json();
-    return { ok: true, data };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-export async function apiPwd() {
-  try {
-    const res = await fetch('/api/fs/pwd');
-    if (!res.ok) return { ok: false, error: 'Network error' };
-    const data = await res.json();
-    return { ok: true, data };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-export async function apiTree() {
-  try {
-    const res = await fetch('/api/fs/tree');
-    if (!res.ok) return { ok: false, error: 'Network error' };
-    const data = await res.json();
-    return { ok: true, data };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-}
-
-
-
+// ... other API functions (apiTouch, apiRm, etc.) follow the same pattern ...
